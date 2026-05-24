@@ -106,30 +106,36 @@ modded class SCR_CommandActionsEditorComponent : SCR_BaseActionsEditorComponent
 
 		bool isQueue = GetGame().GetInputManager().GetActionValue("EditorModifier") > 0;
 
-		// Find which action PerformDefaultAction would use
+		// Get cursor position and default action
 		vector position;
 		array<ref SCR_EditorActionData> actions = {};
-		SCR_BaseEditorAction actionToMark = null;
+		SCR_BaseEditorAction defaultAction = null;
 		for (int i = 0, count = GetAndEvaluateActions(position, actions); i < count; i++)
 		{
 			SCR_BaseEditorAction action = actions[i].GetAction();
 			if (m_DefaultActionGroups.IsEmpty() || m_DefaultActionGroups.Contains(action.GetActionGroup()))
 			{
-				actionToMark = action;
+				defaultAction = action;
 				break;
 			}
 		}
 
+		// Use current action if set, otherwise use default
+		SCR_BaseEditorAction actionToPerform = defaultAction;
+		if (m_CurrentAction)
+			actionToPerform = m_CurrentAction;
+		if (!actionToPerform)
+			return;
+
 		GME_m_vLastWaypointPos = position;
+
+		// Set current action so PerformDefaultAction uses it
+		SetCurrentAction(actionToPerform);
 		PerformDefaultAction(isQueue);
 
-		// Set AFTER PerformDefaultAction so vanilla's OnPlacingSelectedPrefabChange(null) reset runs first
-		if (actionToMark)
-		{
-			SetCurrentAction(actionToMark);
-			GME_m_LastChosenAction = actionToMark;
-		}
-
+		// Restore after vanilla reset
+		SetCurrentAction(actionToPerform);
+		GME_m_LastChosenAction = actionToPerform;
 		GME_m_bSuppressMenu = true;
 	}
 }
