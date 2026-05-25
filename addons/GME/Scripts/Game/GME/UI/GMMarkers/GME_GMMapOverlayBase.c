@@ -9,7 +9,7 @@ difference lives in the lifecycle hooks.
 */
 class GME_GMMapOverlayBase : Managed
 {
-	static const ResourceName MARKER_LAYOUT = "{00000000DEADBEEF}UI/layouts/GMMarkers/GME_GMUnitMarker.layout"; // TODO replace GUID once layout asset is registered
+	static const ResourceName MARKER_LAYOUT = "{6D6EE0271C44EBF1}UI/layouts/GMMarkers/GME_GMUnitMarker.layout";
 	static const float UPDATE_INTERVAL = 0.1; // 10 Hz
 	static const int DEFAULT_POOL_SIZE = 200;
 	static const int ICON_W = 30;

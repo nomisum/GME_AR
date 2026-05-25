@@ -22,8 +22,8 @@ class GME_GMFullscreenMapOverlayUIComponent : SCR_MapUIBaseComponent
 
 		if (m_MapEntity)
 		{
-			m_MapEntity.GetOnMapPan().Insert(OnPanZoom);
-			m_MapEntity.GetOnMapZoom().Insert(OnPanZoom);
+			m_MapEntity.GetOnMapPan().Insert(OnPan);
+			m_MapEntity.GetOnMapZoom().Insert(OnZoom);
 		}
 	}
 
@@ -32,8 +32,8 @@ class GME_GMFullscreenMapOverlayUIComponent : SCR_MapUIBaseComponent
 	{
 		if (m_MapEntity)
 		{
-			m_MapEntity.GetOnMapPan().Remove(OnPanZoom);
-			m_MapEntity.GetOnMapZoom().Remove(OnPanZoom);
+			m_MapEntity.GetOnMapPan().Remove(OnPan);
+			m_MapEntity.GetOnMapZoom().Remove(OnZoom);
 		}
 
 		if (m_pHelper)
@@ -55,7 +55,15 @@ class GME_GMFullscreenMapOverlayUIComponent : SCR_MapUIBaseComponent
 	}
 
 	//------------------------------------------------------------------------------------------------
-	protected void OnPanZoom(float x, float y)
+	protected bool OnPan(float x, float y, bool input)
+	{
+		if (m_pHelper)
+			m_pHelper.OnPanOrZoom();
+		return false;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	protected void OnZoom(float z)
 	{
 		if (m_pHelper)
 			m_pHelper.OnPanOrZoom();

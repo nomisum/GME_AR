@@ -1,38 +1,185 @@
 /*!
-Map marker manager extension — provides a server-side helper to insert a
-marker that is pre-tagged as global (visible to all factions).
-
-STUB — concrete vanilla create-marker entry points (names + signatures) must
-be looked up before this can be implemented.
-
-TODOs:
-1. Open vanilla SCR_MapMarkerManagerComponent.c in the base editor addon
-   (58D0FB3206B6F859) and identify the server-side static-marker creation
-   method (likely `CreateStaticMarker(...)` or `InsertStaticMarker(...)`).
-   Note its signature.
-2. Implement `GME_CreateGlobalStaticMarker(...)` here that delegates to the
-   vanilla create method, then calls `GME_SetGlobal(true)` on the returned
-   marker BEFORE the broadcast that announces the new marker. If the broadcast
-   happens inside the vanilla create method, the order must be preserved
-   (either re-broadcast or insert the global tag pre-broadcast).
-3. Same for dynamic markers — confirm whether dynamic markers go through this
-   manager or are spawned directly as entities, and add a parallel
-   `GME_CreateGlobalDynamicMarker(...)` if needed.
+Map marker manager extension — three concerns:
+1. GME_CreateGlobalStaticMarker: server-side helper that stamps a marker global
+   and inserts it as a server marker (no owner, broadcast to all factions).
+2. OnAddSynchedMarker override: global markers skip the faction filter so they
+   show on all clients regardless of faction, and apply faction tint via the
+   widget component.
+3. RplSave/RplLoad overrides: the vanilla manual serialization path must also
+   carry m_bGME_IsGlobal so late-joining clients receive the correct state.
+   The snapshot pipeline (Extract/Inject/Encode/Decode) handles live replication;
+   RplSave/RplLoad handles initial session join.
 */
 modded class SCR_MapMarkerManagerComponent
 {
 	//------------------------------------------------------------------------------------------------
-	//! Server-only. Inserts a static marker pre-tagged as global so the modded widget
+	//! Server-only. Inserts a static marker pre-tagged as global so the modded
 	//! visibility predicate renders it for every faction.
 	void GME_CreateGlobalStaticMarker(int type, int posX, int posZ, int rotation, int ownerID)
 	{
 		if (!Replication.IsServer())
 			return;
 
-		// TODO: replace with the actual vanilla server-side create call once located.
-		// SCR_MapMarkerBase marker = CreateStaticMarker(type, posX, posZ, rotation, ownerID);
-		// if (marker)
-		//     marker.GME_SetGlobal(true);
-		Print("[GME] GME_CreateGlobalStaticMarker stub — wire to vanilla create method.", LogLevel.WARNING);
+		SCR_MapMarkerBase marker = new SCR_MapMarkerBase();
+		marker.SetType(type);
+		marker.SetWorldPos(posX, posZ);
+		marker.SetRotation(rotation);
+		marker.SetMarkerOwnerID(ownerID);
+		marker.GME_SetGlobal(true);
+
+		InsertStaticMarker(marker, false, true);
+	}
+
+	//------------------------------------------------------------------------------------------------
+	//! Override: global markers bypass the faction filter and show on all clients.
+	override void OnAddSynchedMarker(SCR_MapMarkerBase marker)
+	{
+		if (!marker.GME_IsGlobal())
+		{
+			super.OnAddSynchedMarker(marker);
+			return;
+		}
+
+		// Global markers are always visible — skip faction check, never server-disable.
+		m_aStaticMarkers.Insert(marker);
+
+		if (System.IsConsoleApp())
+			return;
+
+		if (marker.GetMarkerOwnerID() > -1)
+			marker.RequestProfanityFilter();
+
+		SCR_MapEntity mapEnt = SCR_MapEntity.GetMapInstance();
+		if (mapEnt.IsOpen() && mapEnt.GetMapUIComponent(SCR_MapMarkersUI))
+		{
+			marker.OnCreateMarker(true);
+			SCR_MapMarkerWidgetComponent widgetComp = marker.GetMarkerComponent();
+			if (widgetComp)
+				widgetComp.GME_ApplyFactionTint();
+		}
+	}
+
+	//------------------------------------------------------------------------------------------------
+	override event protected bool RplSave(ScriptBitWriter writer)
+	{
+		int count = 0;
+
+		array<SCR_MapMarkerBase> markersSimple = GetStaticMarkers();
+		foreach (SCR_MapMarkerBase markerDis : GetDisabledMarkers())
+			markersSimple.Insert(markerDis);
+
+		if (markersSimple.IsEmpty())
+		{
+			writer.WriteInt(count);
+			return true;
+		}
+
+		foreach (SCR_MapMarkerBase marker : markersSimple)
+		{
+			if (marker.GetMarkerID() != -1)
+				count++;
+		}
+
+		writer.WriteInt(count);
+
+		WorldTimestamp timestamp;
+
+		foreach (SCR_MapMarkerBase marker : markersSimple)
+		{
+			if (marker.GetMarkerID() == -1)
+				continue;
+
+			int pos[2];
+			marker.GetWorldPos(pos);
+
+			writer.WriteInt(pos[0]);
+			writer.WriteInt(pos[1]);
+			writer.WriteInt(marker.GetMarkerID());
+			writer.WriteInt(marker.GetMarkerOwnerID());
+			writer.WriteInt(marker.GetFlags());
+			writer.WriteInt(marker.GetMarkerConfigID());
+			writer.WriteInt(marker.GetMarkerFactionFlags());
+			writer.Write(marker.GetRotation(), 16);
+			writer.Write(marker.GetType(), 8);
+			writer.Write(marker.GetColorEntry(), 8);
+			writer.Write(marker.GetIconEntry(), 16);
+			writer.WriteString(marker.GetCustomText());
+			writer.WriteBool(marker.IsTimestampVisible());
+			if (marker.IsTimestampVisible())
+			{
+				timestamp = marker.GetTimestamp();
+				writer.Write(timestamp, 64);
+			}
+			writer.WriteBool(marker.GME_IsGlobal());
+		}
+
+		return true;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	override event protected bool RplLoad(ScriptBitReader reader)
+	{
+		int count;
+		reader.ReadInt(count);
+		if (count == 0)
+			return true;
+
+		int posX, posY, markerID, markerOwnerID, flags, markerConfigID, factionFlags, markerType, colorID, iconID, rotation;
+		string customText;
+		bool isTimestampVisible;
+		bool isGlobal;
+		WorldTimestamp timestamp;
+		SCR_MapMarkerBase marker;
+		array<string> textsToFilter = {};
+
+		for (int i; i < count; i++)
+		{
+			reader.ReadInt(posX);
+			reader.ReadInt(posY);
+			reader.ReadInt(markerID);
+			reader.ReadInt(markerOwnerID);
+			reader.ReadInt(flags);
+			reader.ReadInt(markerConfigID);
+			reader.ReadInt(factionFlags);
+			reader.Read(rotation, 16);
+			reader.Read(markerType, 8);
+			reader.Read(colorID, 8);
+			reader.Read(iconID, 16);
+			reader.ReadString(customText);
+			reader.ReadBool(isTimestampVisible);
+			if (isTimestampVisible)
+				reader.Read(timestamp, 64);
+			reader.ReadBool(isGlobal);
+
+			marker = new SCR_MapMarkerBase();
+			marker.SetType(markerType);
+			marker.SetWorldPos(posX, posY);
+			marker.SetMarkerID(markerID);
+			marker.SetMarkerOwnerID(markerOwnerID);
+			marker.SetFlags(flags);
+			marker.SetMarkerConfigID(markerConfigID);
+			marker.SetMarkerFactionFlags(factionFlags);
+			marker.SetRotation(rotation);
+			marker.SetColorEntry(colorID);
+			marker.SetIconEntry(iconID);
+			marker.SetCustomText(customText);
+			marker.SetTimestampVisibility(isTimestampVisible);
+			if (isTimestampVisible)
+				marker.SetTimestamp(timestamp);
+			marker.GME_SetGlobal(isGlobal);
+
+			m_aStaticMarkers.Insert(marker);
+			if (marker.GetMarkerOwnerID() > -1)
+				textsToFilter.Insert(marker.GetCustomText());
+		}
+
+		if (!textsToFilter.IsEmpty())
+		{
+			SCR_ScriptProfanityFilterRequestCallback cb = RequestProfanityFilter(textsToFilter);
+			if (cb)
+				cb.m_OnResult.Insert(OnFilteredCallback);
+		}
+
+		return true;
 	}
 };

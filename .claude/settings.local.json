@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "mcp__enfusion-mcp__api_search"
+    ]
+  }
+}

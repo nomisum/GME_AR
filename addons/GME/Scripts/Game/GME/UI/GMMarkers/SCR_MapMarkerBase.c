@@ -2,21 +2,9 @@
 GM marker extension — adds a "global" flag (visible to all factions) on top of
 vanilla static markers.
 
-STUB — vanilla `SCR_MapMarkerBase` is hand-rolled (non-entity) replication.
-This file declares the new flag and its accessors but the network serialization
-hooks must be wired into vanilla's read/write pair before merge.
-
-TODOs (must be resolved before this is functional):
-1. Open vanilla SCR_MapMarkerBase.c in the base editor addon (58D0FB3206B6F859);
-   locate its `Write(ScriptBitWriter)` / `Read(ScriptBitReader)` (or equivalently
-   named) pair and confirm the override signature.
-2. Append a single bit for `m_bGME_IsGlobal` to both Write and Read overrides
-   here. Mind backwards-compat — old replicated streams will not include this
-   bit, so guard accordingly (default false on read failure).
-3. If serialization can't be cleanly extended, switch to the sentinel-ownerID
-   fallback documented in the plan: reserve a magic ownerID (e.g. -2) for
-   "global" markers and have `GME_IsGlobal()` interpret that, dropping the
-   member entirely.
+Serialization mirrors the m_bIsTimestampVisible pattern: the bool is appended
+after the fixed-byte blob and string in every snapshot method. Static methods
+cannot call super, so the vanilla body is reproduced and the new field appended.
 */
 modded class SCR_MapMarkerBase
 {
@@ -34,18 +22,95 @@ modded class SCR_MapMarkerBase
 		m_bGME_IsGlobal = global;
 	}
 
-	// TODO override Write/Read once vanilla signatures are known:
-	//
-	// override bool Write(ScriptBitWriter writer)
-	// {
-	//     if (!super.Write(writer)) return false;
-	//     writer.WriteBool(m_bGME_IsGlobal);
-	//     return true;
-	// }
-	//
-	// override bool Read(ScriptBitReader reader)
-	// {
-	//     if (!super.Read(reader)) return false;
-	//     return reader.ReadBool(m_bGME_IsGlobal);
-	// }
+	//------------------------------------------------------------------------------------------------
+	override static bool Extract(SCR_MapMarkerBase instance, ScriptCtx ctx, SSnapSerializerBase snapshot)
+	{
+		snapshot.SerializeInt(instance.m_iPosWorldX);
+		snapshot.SerializeInt(instance.m_iPosWorldY);
+		snapshot.SerializeInt(instance.m_iMarkerID);
+		snapshot.SerializeInt(instance.m_iMarkerOwnerID);
+		snapshot.SerializeInt(instance.m_iFlags);
+		snapshot.SerializeInt(instance.m_iConfigID);
+		snapshot.SerializeInt(instance.m_iFactionFlags);
+		snapshot.SerializeBytes(instance.m_iRotation, 2);
+		snapshot.SerializeBytes(instance.m_eType, 1);
+		snapshot.SerializeBytes(instance.m_iColorEntry, 1);
+		snapshot.SerializeBytes(instance.m_iIconEntry, 2);
+		snapshot.SerializeString(instance.m_sCustomText);
+		snapshot.SerializeBool(instance.m_bIsTimestampVisible);
+		snapshot.SerializeBytes(instance.m_Timestamp, 8);
+		snapshot.SerializeBool(instance.m_bGME_IsGlobal);
+		return true;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	override static bool Inject(SSnapSerializerBase snapshot, ScriptCtx ctx, SCR_MapMarkerBase instance)
+	{
+		snapshot.SerializeInt(instance.m_iPosWorldX);
+		snapshot.SerializeInt(instance.m_iPosWorldY);
+		snapshot.SerializeInt(instance.m_iMarkerID);
+		snapshot.SerializeInt(instance.m_iMarkerOwnerID);
+		snapshot.SerializeInt(instance.m_iFlags);
+		snapshot.SerializeInt(instance.m_iConfigID);
+		snapshot.SerializeInt(instance.m_iFactionFlags);
+		snapshot.SerializeBytes(instance.m_iRotation, 2);
+		snapshot.SerializeBytes(instance.m_eType, 1);
+		snapshot.SerializeBytes(instance.m_iColorEntry, 1);
+		snapshot.SerializeBytes(instance.m_iIconEntry, 2);
+		snapshot.SerializeString(instance.m_sCustomText);
+		snapshot.SerializeBool(instance.m_bIsTimestampVisible);
+		snapshot.SerializeBytes(instance.m_Timestamp, 8);
+		snapshot.SerializeBool(instance.m_bGME_IsGlobal);
+		return true;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	override static void Encode(SSnapSerializerBase snapshot, ScriptCtx ctx, ScriptBitSerializer packet)
+	{
+		snapshot.Serialize(packet, SERIALIZED_BYTES);
+		snapshot.EncodeString(packet);
+		snapshot.EncodeBool(packet); // m_bIsTimestampVisible
+		snapshot.Serialize(packet, 8); // m_Timestamp
+		snapshot.EncodeBool(packet); // m_bGME_IsGlobal
+	}
+
+	//------------------------------------------------------------------------------------------------
+	override static bool Decode(ScriptBitSerializer packet, ScriptCtx ctx, SSnapSerializerBase snapshot)
+	{
+		snapshot.Serialize(packet, SERIALIZED_BYTES);
+		snapshot.DecodeString(packet);
+		snapshot.DecodeBool(packet); // m_bIsTimestampVisible
+		snapshot.Serialize(packet, 8); // m_Timestamp
+		snapshot.DecodeBool(packet); // m_bGME_IsGlobal
+		return true;
+	}
+
+	//------------------------------------------------------------------------------------------------
+	override static bool SnapCompare(SSnapSerializerBase lhs, SSnapSerializerBase rhs, ScriptCtx ctx)
+	{
+		return lhs.CompareSnapshots(rhs, SERIALIZED_BYTES)
+			&& lhs.CompareStringSnapshots(rhs)
+			&& lhs.CompareSnapshots(rhs, 4 + 8)  // m_bIsTimestampVisible + m_Timestamp
+			&& lhs.CompareSnapshots(rhs, 4);      // m_bGME_IsGlobal
+	}
+
+	//------------------------------------------------------------------------------------------------
+	override static bool PropCompare(SCR_MapMarkerBase instance, SSnapSerializerBase snapshot, ScriptCtx ctx)
+	{
+		return snapshot.CompareInt(instance.m_iPosWorldX)
+			&& snapshot.CompareInt(instance.m_iPosWorldY)
+			&& snapshot.CompareInt(instance.m_iMarkerID)
+			&& snapshot.CompareInt(instance.m_iMarkerOwnerID)
+			&& snapshot.CompareInt(instance.m_iFlags)
+			&& snapshot.CompareInt(instance.m_iConfigID)
+			&& snapshot.CompareInt(instance.m_iFactionFlags)
+			&& snapshot.Compare(instance.m_iRotation, 2)
+			&& snapshot.Compare(instance.m_eType, 1)
+			&& snapshot.Compare(instance.m_iColorEntry, 1)
+			&& snapshot.Compare(instance.m_iIconEntry, 2)
+			&& snapshot.CompareString(instance.m_sCustomText)
+			&& snapshot.CompareBool(instance.m_bIsTimestampVisible)
+			&& snapshot.Compare(instance.m_Timestamp, 8)
+			&& snapshot.CompareBool(instance.m_bGME_IsGlobal);
+	}
 };
