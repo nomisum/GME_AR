@@ -14,8 +14,12 @@ modded class SCR_MapMarkerSyncComponent
 	//------------------------------------------------------------------------------------------------
 	override void AskAddStaticMarker(notnull SCR_MapMarkerBase marker)
 	{
-		if (GME_GMMapOverlayBase.IsGmModeActive())
+		bool gmActive = GME_GMMapOverlayBase.IsGmModeActive();
+		Print(string.Format("[GME][SyncComp] AskAddStaticMarker | gmActive=%1", gmActive), LogLevel.WARNING);
+
+		if (gmActive)
 		{
+			Print("[GME][SyncComp] Routing to GME_RpcAsk_CreateGlobalStaticMarker", LogLevel.WARNING);
 			Rpc(GME_RpcAsk_CreateGlobalStaticMarker, marker);
 			return;
 		}
@@ -28,17 +32,26 @@ modded class SCR_MapMarkerSyncComponent
 	protected void GME_RpcAsk_CreateGlobalStaticMarker(SCR_MapMarkerBase markerData)
 	{
 		int playerID = SCR_PlayerController.Cast(GetOwner()).GetPlayerId();
+		Print(string.Format("[GME][SyncComp][Server] GME_RpcAsk_CreateGlobalStaticMarker | playerID=%1", playerID), LogLevel.WARNING);
+
 		SCR_EditorManagerCore core = SCR_EditorManagerCore.Cast(SCR_EditorManagerCore.GetInstance(SCR_EditorManagerCore));
 		if (!core || !core.GetEditorManager(playerID))
+		{
+			Print(string.Format("[GME][SyncComp][Server] GM auth failed | core=%1 editorMgr=%2", core != null, core && core.GetEditorManager(playerID) != null), LogLevel.WARNING);
 			return;
+		}
 
 		SCR_MapMarkerManagerComponent markerMgr = SCR_MapMarkerManagerComponent.GetInstance();
 		if (!markerMgr)
+		{
+			Print("[GME][SyncComp][Server] markerMgr is null", LogLevel.WARNING);
 			return;
+		}
 
 		markerData.GME_SetGlobal(true);
 		markerData.SetMarkerOwnerID(-1);
 		markerMgr.AssignMarkerUID(markerData);
+		Print(string.Format("[GME][SyncComp][Server] Calling OnAddSynchedMarker | isGlobal=%1 ownerID=%2 uid=%3", markerData.GME_IsGlobal(), markerData.GetMarkerOwnerID(), markerData.GetMarkerID()), LogLevel.WARNING);
 		markerMgr.OnAddSynchedMarker(markerData);
 		markerMgr.OnAskAddStaticMarker(markerData);
 	}

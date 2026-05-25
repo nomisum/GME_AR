@@ -3,7 +3,16 @@
     "allow": [
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\" -Recurse -File)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "mcp__enfusion-mcp__api_search"
+      "mcp__enfusion-mcp__api_search",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\" -Recurse -Directory)",
+      "Bash(Sort-Object)",
+      "Bash(xargs grep -l \"GameMode\\\\|MapConfig\")",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\\\\addons\\\\GME\" -Directory | ForEach-Object { $_.Name } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\\\\addons\\\\GME\\\\Configs\" -Recurse -Directory | ForEach-Object { $_.FullName.Replace\\(\"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\\\\addons\\\\GME\\\\\", \"\"\\) } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\\\\addons\\\\GME\\\\UI\" -Recurse -Directory | ForEach-Object { $_.FullName.Replace\\(\"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\\\\addons\\\\GME\\\\\", \"\"\\) } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\nomisum\\\\Documents\\\\my games\\\\ArmaReforgerWorkbench\\\\addons\\\\GME_AR\\\\addons\\\\GME\\\\UI\\\\layouts\\\\GMMarkers\" -File | ForEach-Object { $_.FullName })",
+      "mcp__enfusion-mcp__game_read",
+      "mcp__enfusion-mcp__asset_search"
     ]
   }
 }

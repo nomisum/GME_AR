@@ -33,7 +33,10 @@ class GME_GMMapOverlayBase : Managed
 
 		WorkspaceWidget ws = GetGame().GetWorkspace();
 		if (!ws || !root)
+		{
+			Print(string.Format("[GME][Overlay] Init failed | ws=%1 root=%2", ws != null, root != null), LogLevel.WARNING);
 			return;
+		}
 
 		for (int i = 0; i < poolSize; i++)
 		{
@@ -44,6 +47,8 @@ class GME_GMMapOverlayBase : Managed
 			w.SetVisible(false);
 			m_aWidgetPool.Insert(w);
 		}
+
+		Print(string.Format("[GME][Overlay] Init done | poolCreated=%1 mapEntity=%2", m_aWidgetPool.Count(), mapEntity != null), LogLevel.WARNING);
 	}
 
 	//------------------------------------------------------------------------------------------------
@@ -75,6 +80,14 @@ class GME_GMMapOverlayBase : Managed
 			return;
 		}
 
+		// Confirm Tick is reaching here at all (printed once per second max).
+		m_fDbgTickLogAccum += timeSlice;
+		if (m_fDbgTickLogAccum >= 1.0)
+		{
+			m_fDbgTickLogAccum = 0;
+			Print(string.Format("[GME][Overlay] Tick active | poolSize=%1", m_aWidgetPool.Count()), LogLevel.WARNING);
+		}
+
 		m_fAccumulator += timeSlice;
 		if (!m_bForceRedraw && m_fAccumulator < UPDATE_INTERVAL)
 			return;
@@ -83,6 +96,11 @@ class GME_GMMapOverlayBase : Managed
 		m_bForceRedraw = false;
 		Redraw();
 	}
+
+	// Debug counters/accumulators — printed only on change or once per second.
+	protected int m_iDbgLastEntityCount = -1;
+	protected int m_iDbgLastDrawnCount = -1;
+	protected float m_fDbgTickLogAccum = 0;
 
 	//------------------------------------------------------------------------------------------------
 	//! True only when the local player is in the editor sky-view (not just having GM permissions).
@@ -106,21 +124,31 @@ class GME_GMMapOverlayBase : Managed
 	protected void Redraw()
 	{
 		if (!m_pMapEntity || m_aWidgetPool.IsEmpty())
+		{
+			Print(string.Format("[GME][Overlay] Redraw early-exit | mapEntity=%1 poolEmpty=%2", m_pMapEntity != null, m_aWidgetPool.IsEmpty()), LogLevel.WARNING);
 			return;
+		}
 
 		WorkspaceWidget ws = GetGame().GetWorkspace();
 		if (!ws)
+		{
+			Print("[GME][Overlay] Redraw early-exit: workspace null", LogLevel.WARNING);
 			return;
+		}
 
 		SCR_EditableEntityCore core = SCR_EditableEntityCore.Cast(SCR_EditableEntityCore.GetInstance(SCR_EditableEntityCore));
 		if (!core)
+		{
+			Print("[GME][Overlay] Redraw early-exit: EditableEntityCore null", LogLevel.WARNING);
 			return;
+		}
 
 		set<SCR_EditableEntityComponent> entities = new set<SCR_EditableEntityComponent>();
 		core.GetAllEntities(entities);
 
 		int idx = 0;
 		int poolSize = m_aWidgetPool.Count();
+		int totalEntities = entities.Count();
 
 		foreach (SCR_EditableEntityComponent ent : entities)
 		{
@@ -172,6 +200,14 @@ class GME_GMMapOverlayBase : Managed
 			Widget w = m_aWidgetPool[i];
 			if (w && w.IsVisible())
 				w.SetVisible(false);
+		}
+
+		// Print only when counts change to avoid log spam.
+		if (idx != m_iDbgLastDrawnCount || totalEntities != m_iDbgLastEntityCount)
+		{
+			Print(string.Format("[GME][Overlay] Redraw | totalEditable=%1 drawn=%2 poolSize=%3", totalEntities, idx, poolSize), LogLevel.WARNING);
+			m_iDbgLastEntityCount = totalEntities;
+			m_iDbgLastDrawnCount = idx;
 		}
 	}
 

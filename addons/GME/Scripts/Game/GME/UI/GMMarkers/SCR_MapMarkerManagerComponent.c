@@ -34,6 +34,8 @@ modded class SCR_MapMarkerManagerComponent
 	//! Override: global markers bypass the faction filter and show on all clients.
 	override void OnAddSynchedMarker(SCR_MapMarkerBase marker)
 	{
+		Print(string.Format("[GME][MarkerMgr] OnAddSynchedMarker | isGlobal=%1 ownerID=%2 uid=%3", marker.GME_IsGlobal(), marker.GetMarkerOwnerID(), marker.GetMarkerID()), LogLevel.WARNING);
+
 		if (!marker.GME_IsGlobal())
 		{
 			super.OnAddSynchedMarker(marker);
@@ -50,10 +52,15 @@ modded class SCR_MapMarkerManagerComponent
 			marker.RequestProfanityFilter();
 
 		SCR_MapEntity mapEnt = SCR_MapEntity.GetMapInstance();
-		if (mapEnt.IsOpen() && mapEnt.GetMapUIComponent(SCR_MapMarkersUI))
+		bool mapOpen = mapEnt && mapEnt.IsOpen();
+		bool hasMarkersUI = mapOpen && mapEnt.GetMapUIComponent(SCR_MapMarkersUI) != null;
+		Print(string.Format("[GME][MarkerMgr] OnAddSynchedMarker global path | mapOpen=%1 hasMarkersUI=%2", mapOpen, hasMarkersUI), LogLevel.WARNING);
+
+		if (mapOpen && hasMarkersUI)
 		{
 			marker.OnCreateMarker(true);
 			SCR_MapMarkerWidgetComponent widgetComp = marker.GetMarkerComponent();
+			Print(string.Format("[GME][MarkerMgr] widgetComp=%1", widgetComp != null), LogLevel.WARNING);
 			if (widgetComp)
 				widgetComp.GME_ApplyFactionTint();
 		}
