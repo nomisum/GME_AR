@@ -1,0 +1,36 @@
+FrameWidgetClass {
+ Name "MarkerRoot"
+ Slot FrameWidgetSlot "{00000000DEADBEE1}" {
+  PositionX 0
+  PositionY 0
+  SizeX 30
+  SizeY 32
+ }
+ {
+  ImageWidgetClass "{00000000DEADBEE2}" {
+   Name "Icon"
+   Slot FrameWidgetSlot "{00000000DEADBEE3}" {
+    PositionX 0
+    PositionY 0
+    SizeX 30
+    SizeY 30
+   }
+   Color 1 1 1 1
+   // TODO replace with a real icon texture asset path once one exists
+   Image "{00000000DEADBEE4}UI/Textures/Editor/Placeholder/Marker_Circle.edds"
+  }
+  TextWidgetClass "{00000000DEADBEE5}" {
+   Name "Label"
+   "Is Visible" 0
+   Slot FrameWidgetSlot "{00000000DEADBEE6}" {
+    PositionX 0
+    PositionY 30
+    SizeX 30
+    SizeY 12
+   }
+   Text ""
+   "Font Size" 10
+   "Horizontal Alignment" Center
+  }
+ }
+}
