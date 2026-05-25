@@ -31,32 +31,32 @@ modded class SCR_CommandActionsEditorComponent : SCR_BaseActionsEditorComponent
 			if (!children)
 				continue;
 
-			SCR_EditableWaypointComponent firstWaypoint = null;
+			// Collect all waypoints and their positions
+			array<vector> waypointPositions = {};
 			foreach (SCR_EditableEntityComponent child : children)
 			{
 				SCR_EditableWaypointComponent waypoint = SCR_EditableWaypointComponent.Cast(child);
 				if (!waypoint)
 					continue;
 				Print(string.Format("[GME] ReplaceWaypoint: waypoint found, IsCurrent=%1", waypoint.IsCurrent()), LogLevel.WARNING);
-				if (waypoint.IsCurrent())
-				{
-					firstWaypoint = waypoint;
-					break;
-				}
-				if (!firstWaypoint)
-					firstWaypoint = waypoint;
+				waypointPositions.Insert(waypoint.GetOwner().GetOrigin());
 			}
 
-			if (firstWaypoint)
-				GME_m_vLastWaypointPos = firstWaypoint.GetOwner().GetOrigin();
+			Print(string.Format("[GME] ReplaceWaypoint: collected %1 waypoints", waypointPositions.Count()), LogLevel.WARNING);
 
-			Print(string.Format("[GME] ReplaceWaypoint: pos=%1 (stored=%2)", firstWaypoint != null, GME_m_vLastWaypointPos), LogLevel.WARNING);
+			if (waypointPositions.IsEmpty())
+				continue;
 
-			if (GME_m_vLastWaypointPos == vector.Zero)
-				return;
-
-			ActionPerform(action, GME_m_vLastWaypointPos, ValidateSelection(true));
+			// Replace each waypoint at its position with the new type
 			SetCurrentAction(action);
+			int evalFlags = ValidateSelection(true);
+			for (int i = 0; i < waypointPositions.Count(); i++)
+			{
+				vector pos = waypointPositions[i];
+				GME_m_vLastWaypointPos = pos;
+				action.Perform(GetHoveredEntity(), m_SelectedEntities, pos, evalFlags);
+			}
+
 			GME_m_LastChosenAction = action;
 			return;
 		}
@@ -64,8 +64,9 @@ modded class SCR_CommandActionsEditorComponent : SCR_BaseActionsEditorComponent
 		Print(string.Format("[GME] ReplaceWaypoint: no group found in selectedEntities, using stored pos=%1", GME_m_vLastWaypointPos), LogLevel.WARNING);
 		if (GME_m_vLastWaypointPos != vector.Zero)
 		{
-			ActionPerform(action, GME_m_vLastWaypointPos, ValidateSelection(true));
 			SetCurrentAction(action);
+			int evalFlags = ValidateSelection(true);
+			action.Perform(GetHoveredEntity(), m_SelectedEntities, GME_m_vLastWaypointPos, evalFlags);
 			GME_m_LastChosenAction = action;
 		}
 	}
